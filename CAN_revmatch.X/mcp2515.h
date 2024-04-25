@@ -15,17 +15,73 @@
  * NOTE: These predefined settings only support 8MHZ CLOCK
  */
 typedef enum{
+    BUS_SPEED_33KBPS,
     BUS_SPEED_95KBPS,
     BUS_SPEED_500KBPS
 }BUS_SPEED;
+
+#define SETTING_33KBPS_CNF1 0b1010
+#define SETTING_33KBPS_CNF2 0b011001
+#define SETTING_33KBPS_CNF3 0x00
 
 #define SETTING_95KBPS_CNF1 0x01
 #define SETTING_95KBPS_CNF2 0x35
 #define SETTING_95KBPS_CNF3 0x00
 
 #define SETTING_500KBPS_CNF1 0x00
-#define SETTING_500KBPS_CNF2 0x0A
+#define SETTING_500KBPS_CNF2 0x02
 #define SETTING_500KBPS_CNF3 0x00
+
+
+//SPI instruction bytes
+#define INS_RESET 0b11000000
+#define INS_BITMOD 0b00000101
+#define INS_READ 0b00000011
+#define INS_WRITE 0b00000010
+#define INS_LOADTX 0b01000000
+#define INS_RTS 0b10000000
+
+#define INS_READRX 0b10010000
+#define INS_RXSTATUS 0b10110000
+
+//Register definitions
+#define REG_CNF1 0x2A
+#define REG_CNF2 0x29
+#define REG_CNF3 0x28
+
+#define REG_CANINTE 0x2B
+#define REG_CANINTF 0x2C
+#define REG_CANCTRL 0x0F
+
+#define REG_CANSTAT 0x0E
+
+#define REG_RXB0CTRL 0x60
+#define REG_RXB1CTRL 0x70
+
+//Filter registers
+#define REG_RXF0SIDH 0x00
+#define REG_RXF0SIDL 0x01
+
+#define REG_RXF1SIDH 0x04
+#define REG_RXF1SIDL 0x05
+
+#define REG_RXF2SIDH 0x08
+#define REG_RXF2SIDL 0x09
+
+#define REG_RXF3SIDH 0x10
+#define REG_RXF3SIDL 0x11
+
+#define REG_RXF4SIDH 0x14
+#define REG_RXF4SIDL 0x15
+
+#define REG_RXF5SIDH 0x18
+#define REG_RXF5SIDL 0x19
+
+//Filter mask registers
+#define REG_RXM0SIDH 0x20
+#define REG_RXM0SIDL 0x21
+#define REG_RXM1SIDH 0x24
+#define REG_RXM1SIDL 0x25
 
 //Interrupts
 //These enumerations used for enabling and clearing interrupts
@@ -129,7 +185,8 @@ void MCP2515_setclkout(Mcp2515*, MCP_CLKOUT);
 uint8_t MCP2515_get_reg(Mcp2515*, uint8_t reg_address);
 void MCP2515_set_reg(Mcp2515*, uint8_t reg_address, uint8_t data);
 
-void MCP2515_setfilter(Mcp2515*, uint8_t filter_n, uint16_t id);
+//Only set filters when in config mode
+void MCP2515_setfilter(Mcp2515*, uint16_t *filtersIDs);
 void MCP2515_disable_filters(Mcp2515*);
 
 void MCP2515_load_tx(Mcp2515*, Can_frame*, uint8_t buffer);

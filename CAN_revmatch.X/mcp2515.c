@@ -10,53 +10,7 @@
 #include "mcp2515.h"
 
 
-//SPI instruction bytes
-#define INS_RESET 0b11000000
-#define INS_BITMOD 0b00000101
-#define INS_READ 0b00000011
-#define INS_WRITE 0b00000010
-#define INS_LOADTX 0b01000000
-#define INS_RTS 0b10000000
 
-#define INS_READRX 0b10010000
-#define INS_RXSTATUS 0b10110000
-
-//Register definitions
-#define REG_CNF1 0x2A
-#define REG_CNF2 0x29
-#define REG_CNF3 0x28
-
-#define REG_CANINTE 0x2B
-#define REG_CANINTF 0x2C
-#define REG_CANCTRL 0x0F
-
-#define REG_RXB0CTRL 0x60
-#define REG_RXB1CTRL 0x70
-
-//Filter registers
-#define REG_RXF0SIDH 0x00
-#define REG_RXF0SIDL 0x01
-
-#define REG_RXF1SIDH 0x04
-#define REG_RXF1SIDL 0x05
-
-#define REG_RXF2SIDH 0x08
-#define REG_RXF2SIDL 0x09
-
-#define REG_RXF3SIDH 0x10
-#define REG_RXF3SIDL 0x11
-
-#define REG_RXF4SIDH 0x14
-#define REG_RXF4SIDL 0x15
-
-#define REG_RXF5SIDH 0x18
-#define REG_RXF5SIDL 0x19
-
-//Filter mask registers
-#define REG_RXM0SIDH 0x20
-#define REG_RXM0SIDL 0x21
-#define REG_RXM1SIDH 0x24
-#define REG_RXM1SIDL 0x25
 
 //Macros for setting the correct SS/CS pin low
 #define SS_HIGH *self->_ss_pin_port |= (self->_ss_pin_bitmask);
@@ -104,9 +58,13 @@ void MCP2515_ini(Mcp2515* self, BUS_SPEED bus_speed, uint8_t enable_rollover){
     uint8_t cnf1,cnf2,cnf3;
     
     switch(bus_speed){
-
+        case BUS_SPEED_33KBPS:
+            cnf1 = SETTING_33KBPS_CNF1;
+            cnf2 = SETTING_33KBPS_CNF2;
+            cnf3 = SETTING_33KBPS_CNF3;
+            break;
         case BUS_SPEED_95KBPS:
-            cnf1 =  SETTING_95KBPS_CNF1;
+            cnf1 = SETTING_95KBPS_CNF1;
             cnf2 = SETTING_95KBPS_CNF2;
             cnf3 = SETTING_95KBPS_CNF3;
         break;     
@@ -122,7 +80,7 @@ void MCP2515_ini(Mcp2515* self, BUS_SPEED bus_speed, uint8_t enable_rollover){
     MCP2515_set_reg(self, REG_CNF2, cnf2);
     MCP2515_set_reg(self, REG_CNF3, cnf3);
     
-    MCP2515_set_reg(self, REG_RXB0CTRL | (enable_rollover << 2), 0xFF);
+    MCP2515_set_reg(self, REG_RXB0CTRL, 0xFF | (enable_rollover << 2));
     MCP2515_set_reg(self, REG_RXB1CTRL, 0xFF);
 }
 
@@ -262,74 +220,67 @@ void MCP2515_bitmod(Mcp2515* self, uint8_t reg_address, uint8_t mask, uint8_t da
     SS_HIGH;
 }
 
-void MCP2515_setfilter(Mcp2515* self, uint8_t filter_n, uint16_t id){
+void MCP2515_setfilter(Mcp2515* self, uint16_t *filters){
     
     //Filters 0-1 is associated with RX buffer 0 and filters 2-5 with RX buffer 1
-    uint8_t buffer_n = 0;
-    if(filter_n > 1){
-        buffer_n = 1;
-    }
-            
     
-    //Make id bytes
-    uint8_t idh = id >> 3;
-    uint8_t idl = (id & 0b111) << 5;
+    MCP_MODE original_mode = MCP2515_get_reg(self, REG_CANCTRL) & 0xE0;
+    
+    MCP2515_setmode(self, MODE_CONFIGURE);
+
     
     //Get id reg addresses
     uint8_t fil_reg_idh = 0, fil_reg_idl = 0;
     
-    switch(filter_n){
-        case 0:
-            fil_reg_idh =  REG_RXF0SIDH;
-            fil_reg_idl =  REG_RXF0SIDL;
-            break;
-        case 1:
-            fil_reg_idh =  REG_RXF1SIDH;
-            fil_reg_idl =  REG_RXF1SIDL;
-            break;
-        case 2:
-            fil_reg_idh =  REG_RXF2SIDH;
-            fil_reg_idl =  REG_RXF2SIDL;
-            break;
-        case 3:
-            fil_reg_idh =  REG_RXF3SIDH;
-            fil_reg_idl =  REG_RXF3SIDL;
-            break;
-        case 4:
-            fil_reg_idh = REG_RXF4SIDH;
-            fil_reg_idl = REG_RXF4SIDL;
-            break;
-        case 5:
-            fil_reg_idh = REG_RXF5SIDH;
-            fil_reg_idl = REG_RXF5SIDL;
-            break;
-    }
+    for(uint8_t i=0; i < 6; i++){
+        
+        switch(i){
+            case 0:
+                fil_reg_idh =  REG_RXF0SIDH;
+                fil_reg_idl =  REG_RXF0SIDL;
+                break;
+            case 1:
+                fil_reg_idh =  REG_RXF1SIDH;
+                fil_reg_idl =  REG_RXF1SIDL;
+                break;
+            case 2:
+                fil_reg_idh =  REG_RXF2SIDH;
+                fil_reg_idl =  REG_RXF2SIDL;
+                break;
+            case 3:
+                fil_reg_idh =  REG_RXF3SIDH;
+                fil_reg_idl =  REG_RXF3SIDL;
+                break;
+            case 4:
+                fil_reg_idh = REG_RXF4SIDH;
+                fil_reg_idl = REG_RXF4SIDL;
+                break;
+            case 5:
+                fil_reg_idh = REG_RXF5SIDH;
+                fil_reg_idl = REG_RXF5SIDL;
+                break;
+        }
+        
+        //Make id bytes
+        uint8_t idh = filters[i] >> 3;
+        uint8_t idl = (filters[i] & 0b111) << 5;
     
-    //Write filters
-    MCP2515_set_reg(self, fil_reg_idh, idh);
-    MCP2515_set_reg(self, fil_reg_idl, idl);
-    
-    //Get buffer control and mask register address for correct buffer
-    uint8_t rxctrl = 0, rxmh = 0, rxml = 0;
-    if(buffer_n < 1){
-        rxctrl = REG_RXB0CTRL; 
-        rxmh = REG_RXM0SIDH;
-        rxml = REG_RXM0SIDL;
+        //Write filters
+        MCP2515_set_reg(self, fil_reg_idh, idh);
+        MCP2515_set_reg(self, fil_reg_idl, idl);
     }
-    else{
-        rxctrl = REG_RXB1CTRL; 
-        rxmh = REG_RXM1SIDH;
-        rxml = REG_RXM1SIDL;                
-    }
-    
     
     //Turn filters on
-    MCP2515_set_reg(self, rxctrl, 0x00);
+    MCP2515_set_reg(self, REG_RXB0CTRL, 0x00);
+    MCP2515_set_reg(self, REG_RXB1CTRL, 0x00);
     
     //Disable masking
-    MCP2515_set_reg(self, rxmh, 0xFF);
-    MCP2515_set_reg(self, rxml, 0xFF); 
+    MCP2515_set_reg(self, REG_RXM0SIDH, 0xFF);
+    MCP2515_set_reg(self, REG_RXM0SIDL, 0xFF); 
+    MCP2515_set_reg(self, REG_RXM1SIDH, 0xFF);
+    MCP2515_set_reg(self, REG_RXM1SIDL, 0xFF); 
     
+    MCP2515_setmode(self, original_mode);
 }
 
 void MCP2515_disable_filters(Mcp2515* self){
